@@ -16,6 +16,11 @@ test('admin delivery corrections preserve prior proof, require authorization and
   const snapshot = value => structuredClone(value);
   prisma.user.findUnique = async ({ where }) => ({ id: where.id, role: where.id === 'admin' ? 'ADMIN' : 'DRIVER', active: true, passwordHash: 'hash' });
   prisma.user.findFirst = async () => driverActive ? { id: 'driver' } : null;
+  prisma.user.findMany = async ({ where, select }) => {
+    assert.deepEqual(where, { id: { in: ['driver'] }, role: 'DRIVER' });
+    assert.deepEqual(select, { id: true, name: true });
+    return [{ id: 'driver', name: 'João Entregador' }];
+  };
   prisma.delivery.findUnique = async ({ where }) => where.id === 'delivery' ? snapshot(d) : null;
   prisma.delivery.findUniqueOrThrow = async () => snapshot(d);
   prisma.delivery.updateMany = async ({ data }) => {
@@ -56,7 +61,12 @@ test('admin delivery corrections preserve prior proof, require authorization and
     d.status = 'CANCELED'; driverActive = false;
     assert.equal((await call('/delivery/reopen', 'POST', { reason: 'Pedido válido novamente' })).status, 200);
     assert.equal(d.driverId, null);
-    const response = await call('/delivery/history', 'GET'); assert.equal(response.status, 200); assert.equal((await response.json()).length, 3);
+    const response = await call('/delivery/history', 'GET'); assert.equal(response.status, 200); const rows = await response.json(); assert.equal(rows.length, 3);
+    assert.equal(rows[0].beforeDriverName, 'João Entregador');
+    assert.equal(rows[0].afterDriverName, 'João Entregador');
+    assert.equal(rows[2].beforeDriverName, 'João Entregador');
+    assert.equal(rows[2].afterDriverName, null);
     assert.equal((await call('/missing/history', 'GET')).status, 404);
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await prisma.$disconnect(); }
 });
+

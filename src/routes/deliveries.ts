@@ -146,7 +146,16 @@ deliveries.post('/:id/reopen', requireRole('ADMIN'), async (req, res) => {
 deliveries.get('/:id/history', requireRole('ADMIN'), async (req, res) => {
   const id = String(req.params.id);
   if (!await prisma.delivery.findUnique({ where: { id }, select: { id: true } })) return res.status(404).json({ error: 'Entrega não encontrada' });
-  res.json(await prisma.deliveryChange.findMany({ where: { deliveryId: id }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 100, include: { actor: { select: { id: true, name: true } } } }));
+  const changes = await prisma.deliveryChange.findMany({ where: { deliveryId: id }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 100, include: { actor: { select: { id: true, name: true } } } });
+  const driverIdFrom = (value: unknown): string | null => value && typeof value === 'object' && 'driverId' in value && typeof value.driverId === 'string' ? value.driverId : null;
+  const ids = [...new Set(changes.flatMap(change => [driverIdFrom(change.before), driverIdFrom(change.after)]).filter((value): value is string => value !== null))];
+  // Include inactive accounts: deactivation must not hide historical responsibility.
+  const drivers = ids.length ? await prisma.user.findMany({ where: { id: { in: ids }, role: 'DRIVER' }, select: { id: true, name: true } }) : [];
+  const names = new Map(drivers.map(driver => [driver.id, driver.name]));
+  res.json(changes.map(change => ({ ...change,
+    beforeDriverName: names.get(driverIdFrom(change.before) ?? '') ?? null,
+    afterDriverName: names.get(driverIdFrom(change.after) ?? '') ?? null,
+  })));
 });
 const findOwn = (id: string, driverId: string) => prisma.delivery.findFirst({ where: { id, driverId } });
 
@@ -216,6 +225,7 @@ deliveries.post('/:id/complete', requireRole('DRIVER'), async (req, res) => {
   if (result.nextDelivery) publishDeliveryChange(result.nextDelivery);
   res.json({ ...result.delivery, nextDelivery: result.nextDelivery });
 });
+
 
 
 
