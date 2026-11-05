@@ -19,9 +19,9 @@ export function createApp() {
   app.disable('x-powered-by');
   app.set('trust proxy', config.trustProxy);
   app.use(helmet({
-    contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], scriptSrc: ["'self'"], styleSrc: ["'self'"], fontSrc: ["'self'"], imgSrc: ["'self'", 'data:'], connectSrc: ["'self'"], frameAncestors: ["'none'"], upgradeInsecureRequests: config.production ? [] : null } },
+    contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], scriptSrc: ["'self'"], styleSrc: ["'self'"], fontSrc: ["'self'"], imgSrc: ["'self'", 'data:', 'https://tile.openstreetmap.org'], styleSrcAttr: ["'unsafe-inline'"], connectSrc: ["'self'"], frameAncestors: ["'none'"], upgradeInsecureRequests: config.production ? [] : null } },
     strictTransportSecurity: config.production ? { maxAge: 31536000 } : false,
-    referrerPolicy: { policy: 'no-referrer' },
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   }));
   app.use((_req, res, next) => { res.setHeader('Permissions-Policy', 'geolocation=(self), camera=(), microphone=()'); next(); });
   // Railway readiness probes use internal HTTP. Expose only a non-sensitive status here.
@@ -61,4 +61,5 @@ export function createApp() {
   });
   return app;
 }
+
 

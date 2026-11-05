@@ -39,6 +39,8 @@ test('web security: HTTPS, origin, HttpOnly cookie, identity, logout, CSP and lo
     assert.equal(home.status, 200);
     assert.ok(home.headers.get('content-security-policy').includes("script-src 'self'"));
     assert.ok(home.headers.get('strict-transport-security'));
+    assert.ok(home.headers.get('content-security-policy').includes('https://tile.openstreetmap.org'));
+    assert.equal(home.headers.get('referrer-policy'), 'strict-origin-when-cross-origin');
     assert.equal(home.headers.get('permissions-policy'), 'geolocation=(self), camera=(), microphone=()');
     assert.equal(home.headers.get('x-powered-by'), null);
     const login = await call('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'driver@example.com', password: 'password-test123' }) });
@@ -61,6 +63,7 @@ test('web security: HTTPS, origin, HttpOnly cookie, identity, logout, CSP and lo
     assert.equal(last.status, 429);
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await prisma.$disconnect(); }
 });
+
 
 
 

@@ -378,3 +378,18 @@ td .detail-button { display: block; padding: 6px 0; }
 .report-pagination { display: flex; gap: 12px; justify-content: flex-end; padding: 20px 24px; }
 @media (max-width: 800px) { .report-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 480px) { .report-filters { grid-template-columns: 1fr; } }
+.route-panel { margin: 24px 0; padding: 22px; border: 1px solid #e8e8eb; border-radius: 14px; background: white; }
+.delivery-map { height: 360px; width: 100%; border-radius: 10px; border: 1px solid #dedee4; background: #e8edf0; z-index: 0; }
+.delivery-map-marker { display: grid; place-items: center; background: #475569; color: white; border: 2px solid white; border-radius: 50%; font-weight: 700; font-size: 13px; box-shadow: 0 2px 5px #0005; }
+.delivery-map-marker.marker-current { background: #ea580c; font-size: 16px; }
+.delivery-map-marker.marker-selected { outline: 3px solid #2563eb; outline-offset: 2px; }
+.delivery-map .leaflet-control-attribution { font-size: 11px; background: white; }
+.navigation-links { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0; }
+.navigation-links a { text-decoration: none; }
+.route-destination { padding-top: 12px; }
+.route-stop-list { padding-left: 24px; display: grid; gap: 8px; }
+.route-stop-list button { text-align: left; justify-content: flex-start; width: 100%; }
+.selected-stop { border-color: #2563eb; background: #eff6ff; }
+.map-driver-filter { display: grid; gap: 8px; max-width: 360px; font-weight: 600; }
+.map-driver-filter select { padding: 12px; border: 1px solid #dedee4; border-radius: 8px; background: white; }
+@media (max-width: 600px) { .route-panel { padding: 16px; } .delivery-map { height: 300px; } }
