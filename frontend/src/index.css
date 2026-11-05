@@ -1,0 +1,4 @@
+﻿:root { color-scheme: light; }
+#root { min-height: 100vh; width: 100%; }
+button, input, select { font: inherit; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #ea580c; outline-offset: 3px; }

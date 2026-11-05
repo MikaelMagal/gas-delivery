@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  DRIVER
+}
+
+enum DeliveryStatus {
+  PENDING    // atribuída, ainda não iniciada
+  EN_ROUTE   // motoboy escolheu a parada e está indo
+  DELIVERED  // concluída
+  CANCELED
+}
+
+model User {
+  id           String     @id @default(cuid())
+  name         String
+  email        String     @unique
+  passwordHash String
+  role         Role
+  active       Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+
+  deliveries   Delivery[]
+  locations    Location[]
+  shifts       Shift[]
+}
+
+model Delivery {
+  id                 String         @id @default(cuid())
+  customerName       String
+  phone              String?
+  address            String
+  lat                Float
+  lng                Float
+  product            String
+  quantity           Int            @default(1)
+  notes              String?
+  status             DeliveryStatus @default(PENDING)
+  sortOrder          Int            @default(0)   // ordem sugerida pelo adm
+
+  driverId           String?
+  driver             User?          @relation(fields: [driverId], references: [id])
+
+  // comprovação da entrega
+  deliveredAt        DateTime?
+  deliveredLat       Float?
+  deliveredLng       Float?
+  deliveredDistanceM Int?
+
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  @@index([driverId, status])
+}
+
+model Location {
+  id         Int      @id @default(autoincrement())
+  driverId   String
+  driver     User     @relation(fields: [driverId], references: [id])
+  lat        Float
+  lng        Float
+  speed      Float?
+  recordedAt DateTime @default(now())
+
+  @@index([driverId, recordedAt])
+}
+
+model Shift {
+  id        String    @id @default(cuid())
+  driverId  String
+  driver    User      @relation(fields: [driverId], references: [id])
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+
+  @@index([driverId, endedAt])
+}

@@ -1,0 +1,39 @@
+{
+    "name":  "gas-delivery-api",
+    "version":  "0.1.0",
+    "private":  true,
+    "scripts":  {
+                    "dev":  "tsx watch --env-file=.env src/server.ts",
+                    "build":  "tsc",
+                    "start":  "node dist/server.js",
+                    "seed":  "tsx --env-file=.env prisma/seed.ts",
+                    "db:migrate":  "prisma migrate dev",
+                    "typecheck":  "tsc --noEmit"
+                },
+    "dependencies":  {
+                         "@prisma/client":  "6.19.0",
+                         "bcryptjs":  "^3.0.3",
+                         "cors":  "^2.8.6",
+                         "express":  "^5.3.0",
+                         "express-rate-limit":  "^8.7.3",
+                         "helmet":  "^8.3.0",
+                         "jsonwebtoken":  "^9.0.3",
+                         "socket.io":  "^4.8.4",
+                         "zod":  "^4.6.7"
+                     },
+    "devDependencies":  {
+                            "@types/cors":  "^2.8.19",
+                            "@types/express":  "^5.0.6",
+                            "@types/jsonwebtoken":  "^9.0.10",
+                            "@types/node":  "^26.6.6",
+                            "prisma":  "6.19.0",
+                            "tsx":  "^4.23.15",
+                            "typescript":  "^6.0.3"
+                        },
+    "overrides":  {
+                      "@prisma/config":  {
+                                             "effect":  "^3.20.0",
+                                             "deepmerge-ts":  "^8.0.2"
+                                         }
+                  }
+}
