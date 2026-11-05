@@ -57,7 +57,7 @@ deliveries.get('/', requireRole('ADMIN'), async (req, res) => {
 deliveries.get('/mine', requireRole('DRIVER'), async (req, res) => {
   const list = await prisma.delivery.findMany({
     where: { driverId: req.user!.id, status: { not: 'CANCELED' }, ...visibleNow() },
-    orderBy: { sortOrder: 'asc' },
+    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
   });
   res.json(list);
 });
@@ -120,7 +120,11 @@ deliveries.post('/:id/complete', requireRole('DRIVER'), async (req, res) => {
   const result = await prisma.$transaction(async tx => {
     const delivery = await tx.delivery.findFirst({ where: { id, driverId } });
     if (!delivery) return { kind: 'missing' as const };
-    if (delivery.status === 'DELIVERED') return { kind: 'ok' as const, delivery };
+    if (delivery.status === 'DELIVERED') {
+      // Retrying a confirmed stop must never start or skip another stop.
+      const nextDelivery = await tx.delivery.findFirst({ where: { driverId, status: 'EN_ROUTE' } });
+      return { kind: 'ok' as const, delivery, nextDelivery };
+    }
     if (delivery.status !== 'EN_ROUTE') return { kind: 'conflict' as const };
     const shift = await tx.shift.findFirst({ where: { driverId, endedAt: null } });
     if (!shift) return { kind: 'shift' as const };
@@ -130,12 +134,27 @@ deliveries.post('/:id/complete', requireRole('DRIVER'), async (req, res) => {
       status: 'DELIVERED', deliveredAt: new Date(), deliveredLat: lat, deliveredLng: lng, deliveredDistanceM: distance,
     } });
     if (!changed.count) return { kind: 'conflict' as const };
-    return { kind: 'ok' as const, delivery: await tx.delivery.findUniqueOrThrow({ where: { id } }) };
+    const completedDelivery = await tx.delivery.findUniqueOrThrow({ where: { id } });
+    let nextDelivery = await tx.delivery.findFirst({ where: { driverId, status: 'EN_ROUTE' } });
+    if (!nextDelivery) {
+      const pending = await tx.delivery.findFirst({
+        where: { driverId, status: 'PENDING' },
+        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+      });
+      if (pending) {
+        const started = await tx.delivery.updateMany({ where: { id: pending.id, driverId, status: 'PENDING' }, data: { status: 'EN_ROUTE' } });
+        if (!started.count) throw Object.assign(new Error('A próxima parada mudou. Atualize e tente novamente.'), { status: 409 });
+        nextDelivery = await tx.delivery.findUniqueOrThrow({ where: { id: pending.id } });
+      }
+    }
+    return { kind: 'ok' as const, delivery: completedDelivery, nextDelivery };
   }, { isolationLevel: 'Serializable' });
   if (result.kind === 'missing') return res.status(404).json({ error: 'Entrega não encontrada' });
   if (result.kind === 'conflict') return res.status(409).json({ error: 'Selecione esta entrega como parada em rota antes de confirmar. Atualize a lista.' });
   if (result.kind === 'shift') return res.status(409).json({ error: 'Inicie o turno antes de confirmar a entrega.' });
   if (result.kind === 'distance') return res.status(422).json({ error: `Você está a ${result.distance} m do destino. Aproxime-se do endereço ou solicite ao administrador a revisão da localização.`, distanceM: result.distance });
   emitToAdmins('delivery:updated', result.delivery);
-  res.json(result.delivery);
+  if (result.nextDelivery) emitToAdmins('delivery:updated', result.nextDelivery);
+  res.json({ ...result.delivery, nextDelivery: result.nextDelivery });
 });
+

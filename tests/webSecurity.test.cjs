@@ -27,6 +27,14 @@ test('web security: HTTPS, origin, HttpOnly cookie, identity, logout, CSP and lo
     assert.equal((await fetch(base + '/api/auth/me')).status, 426);
     assert.equal((await call('/api/auth/me', { headers: { Origin: 'https://evil.example' } })).status, 403);
     assert.equal((await fetch(base + '/api/health')).status, 200);
+    for (const endpoint of ['/api/drivers', '/api/deliveries', '/api/deliveries/mine', '/api/shifts/current', '/api/locations/other/trail', '/api/route', '/api/geocoding', '/drivers', '/deliveries']) {
+      const denied = await call(endpoint);
+      assert.equal(denied.status, 401, `${endpoint} must require authentication`);
+      const body = await denied.json();
+      assert.equal('passwordHash' in body, false);
+      assert.equal('deliveries' in body, false);
+    }
+    assert.equal((await call('/api/deliveries/other/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lat: 0, lng: 0 }) })).status, 401);
     const home = await call('/');
     assert.equal(home.status, 200);
     assert.ok(home.headers.get('content-security-policy').includes("script-src 'self'"));
@@ -53,5 +61,6 @@ test('web security: HTTPS, origin, HttpOnly cookie, identity, logout, CSP and lo
     assert.equal(last.status, 429);
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await prisma.$disconnect(); }
 });
+
 
 

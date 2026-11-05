@@ -50,7 +50,8 @@ export default function DriverDashboard({ session, onLogout }: { session: Sessio
       })
       if (response.status === 401) { onLogout('Sua sessão expirou. Entre novamente.'); return }
       if (!response.ok) { const data = await response.json().catch(() => null); throw new Error(data?.error || 'Falha ao confirmar a entrega. Atualize a lista antes de tentar novamente.') }
-      setSuccess('Entrega concluída e registrada. Você já pode iniciar a próxima parada.'); reload()
+      const result: Delivery & { nextDelivery: Delivery | null } = await response.json()
+      setSuccess(result.nextDelivery ? `Entrega concluída. Próxima parada em rota: ${result.nextDelivery.customerName}.` : 'Entrega concluída. Nenhuma parada pendente; o turno continua aberto até você encerrá-lo.'); reload()
     } catch (err) { setError(err instanceof TypeError ? 'Falha de conexão. Atualize a lista antes de repetir: a confirmação pode ter sido registrada.' : err instanceof Error ? err.message : 'Não foi possível confirmar a entrega.') }
     finally { lock.current = false; setBusy(false) }
   }
@@ -67,5 +68,6 @@ export default function DriverDashboard({ session, onLogout }: { session: Sessio
     <section aria-labelledby="my-deliveries"><h2 id="my-deliveries">Minhas entregas</h2>{!deliveries.length ? <p className="panel-state">Nenhuma entrega atribuída neste período.</p> : deliveries.map((delivery, index) => <article className={`driver-card ${current?.id === delivery.id ? 'current-stop' : ''}`} key={delivery.id}><div className="driver-section-heading"><h3>{index + 1}. {delivery.customerName}</h3><span className={`status-badge status-${delivery.status}`}>{labels[delivery.status]}</span></div><p>{delivery.address}</p><p>{delivery.quantity} × {delivery.product}</p>{delivery.phone && <p>Telefone: {delivery.phone}</p>}<p>Observações: {delivery.notes || 'Sem observações'}</p>{delivery.status === 'PENDING' && <button className="secondary-button" disabled={unavailable || !shift} onClick={() => void action(`/deliveries/${encodeURIComponent(delivery.id)}/start`, 'Parada selecionada. A parada anterior permanece pendente.')}>Ir para esta parada</button>}</article>)}</section></>}
   </main></div>
 }
+
 
 
