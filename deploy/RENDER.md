@@ -15,3 +15,7 @@ Configure DATABASE_URL com a conexão do Neon, NODE_ENV=production, HOST=0.0.0.0
 O erro `/bin/sh: ... node scripts/railway-prepare.cjs && exec node dist/server.js: not found` ocorre quando o campo Docker Command interpreta a expressão composta como um único executável. O comando simples acima elimina essa dependência da interpretação de aspas pelo painel.
 
 Validação local desta correção: sintaxe dos dois scripts verificada e fluxo de preparação/início validado com chamadas simuladas, sem conexão ou mudança no banco. O deploy no Render ainda precisa ser repetido pelo usuário.
+
+## Erro de variáveis antes de migrations
+
+O bootstrap agora imprime `Configuração de produção inválida [diagnóstico v2]` seguido do nome de cada variável inválida e o motivo (ausente/vazia, aspas externas, NODE_ENV diferente de production ou senha fora dos limites). Não imprime valores. Se o Render continuar mostrando apenas a mensagem antiga `Configure NODE_ENV=production, DATABASE_URL, ADMIN_EMAIL...`, o deploy ainda está usando código anterior: envie scripts/railway-prepare.cjs e scripts/validate-production-env.cjs ao GitHub e selecione Deploy latest commit. Não é necessário alterar o Docker Command, que continua `node scripts/render-start.cjs`. As variáveis precisam estar no Environment do serviço, não apenas no .env local.
