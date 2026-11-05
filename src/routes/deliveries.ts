@@ -5,7 +5,7 @@ import { prisma } from '../prisma';
 import { auth, requireRole } from '../auth';
 import { config } from '../config';
 import { distanceM, startOfToday } from '../utils';
-import { emitToAdmins, emitToDriver } from '../realtime';
+import { publishDeliveryChange } from '../realtime';
 
 export const deliveries = Router();
 deliveries.use(auth);
@@ -38,8 +38,7 @@ deliveries.post('/', requireRole('ADMIN'), async (req, res) => {
     }
     return tx.delivery.create({ data });
   }, { isolationLevel: 'Serializable' });
-  if (d.driverId) emitToDriver(d.driverId, 'delivery:assigned', d);
-  emitToAdmins('delivery:updated', d);
+  publishDeliveryChange(d);
   res.status(201).json(d);
 });
 
@@ -97,9 +96,11 @@ deliveries.patch('/:id', requireRole('ADMIN'), async (req, res) => {
   }).strict().parse(req.body);
   if (!Object.keys(data).length) return res.status(400).json({ error: 'Informe os campos a alterar' });
   const id = String(req.params.id);
+  let previousDriverId: string | null = null;
   const d = await prisma.$transaction(async tx => {
     const before = await tx.delivery.findUnique({ where: { id } });
     if (!before) return null;
+    previousDriverId = before.driverId;
     if (expectedUpdatedAt && before.updatedAt.toISOString() !== expectedUpdatedAt) throw Object.assign(new Error('A entrega foi alterada. Feche o formulário, atualize a lista e tente novamente.'), { status: 409 });
     if (data.driverId !== undefined && before.status !== 'PENDING') throw Object.assign(new Error('Só é possível atribuir motoboy a entregas pendentes'), { status: 409 });
     if (data.status && data.status !== before.status && ['DELIVERED', 'CANCELED'].includes(before.status)) throw Object.assign(new Error('Use Reabrir entrega para alterar uma entrega finalizada.'), { status: 409 });
@@ -116,8 +117,7 @@ deliveries.patch('/:id', requireRole('ADMIN'), async (req, res) => {
     return after;
   }, { isolationLevel: 'Serializable' });
   if (!d) return res.status(404).json({ error: 'Entrega não encontrada' });
-  if (d.driverId) emitToDriver(d.driverId, 'delivery:assigned', d);
-  emitToAdmins('delivery:updated', d);
+  publishDeliveryChange(d, previousDriverId);
   res.json(d);
 });
 
@@ -139,8 +139,7 @@ deliveries.post('/:id/reopen', requireRole('ADMIN'), async (req, res) => {
     return after;
   }, { isolationLevel: 'Serializable' });
   if (!d) return res.status(404).json({ error: 'Entrega não encontrada' });
-  if (d.driverId) emitToDriver(d.driverId, 'delivery:assigned', d);
-  emitToAdmins('delivery:updated', d);
+  publishDeliveryChange(d);
   res.json(d);
 });
 
@@ -168,7 +167,7 @@ deliveries.post('/:id/start', requireRole('DRIVER'), async (req, res) => {
     if (!changed.count) throw Object.assign(new Error('A entrega mudou. Atualize sua lista.'), { status: 409 });
     return tx.delivery.findUniqueOrThrow({ where: { id: d.id } });
   }, { isolationLevel: 'Serializable' });
-  emitToAdmins('delivery:updated', updated);
+  publishDeliveryChange(updated);
   res.json(updated);
 });
 
@@ -213,10 +212,11 @@ deliveries.post('/:id/complete', requireRole('DRIVER'), async (req, res) => {
   if (result.kind === 'conflict') return res.status(409).json({ error: 'Selecione esta entrega como parada em rota antes de confirmar. Atualize a lista.' });
   if (result.kind === 'shift') return res.status(409).json({ error: 'Inicie o turno antes de confirmar a entrega.' });
   if (result.kind === 'distance') return res.status(422).json({ error: `Você está a ${result.distance} m do destino. Aproxime-se do endereço ou solicite ao administrador a revisão da localização.`, distanceM: result.distance });
-  emitToAdmins('delivery:updated', result.delivery);
-  if (result.nextDelivery) emitToAdmins('delivery:updated', result.nextDelivery);
+  publishDeliveryChange(result.delivery);
+  if (result.nextDelivery) publishDeliveryChange(result.nextDelivery);
   res.json({ ...result.delivery, nextDelivery: result.nextDelivery });
 });
+
 
 
 

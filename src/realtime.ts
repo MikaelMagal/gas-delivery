@@ -32,6 +32,7 @@ export function initRealtime(httpServer: HttpServer) {
     const expires = setTimeout(() => socket.disconnect(true), Math.max(0, socket.data.expiresAt - Date.now()));
     socket.on('disconnect', () => clearTimeout(expires));
   });
+  return io;
 }
 
 export const emitToAdmins = (event: string, payload: unknown) => io.to('admins').emit(event, payload);
@@ -41,4 +42,14 @@ export const emitToDriver = (driverId: string, event: string, payload: unknown) 
 export function disconnectDriver(driverId: string) { io?.in(`driver:${driverId}`).disconnectSockets(true); }
 
 
+
+
+// Invalidation contains no customer or GPS data. Consumers fetch their authorized view.
+export function publishDeliveryChange(delivery: { id: string; driverId: string | null }, previousDriverId?: string | null) {
+  const payload = { id: delivery.id };
+  io?.to('admins').emit('delivery:updated', payload);
+  for (const id of new Set([delivery.driverId, previousDriverId])) {
+    if (id) io?.to(`driver:${id}`).emit('delivery:updated', payload);
+  }
+}
 

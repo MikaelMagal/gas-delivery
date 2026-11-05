@@ -1,4 +1,4 @@
-﻿import { disconnectDriver } from '../realtime';
+﻿import { disconnectDriver, emitToAdmins } from '../realtime';
 import { Router } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
@@ -23,6 +23,7 @@ drivers.post('/', async (req, res) => {
     },
     select: { id: true, name: true, email: true },
   });
+  emitToAdmins('driver:updated', { id: user.id });
   res.status(201).json(user);
 });
 
@@ -64,6 +65,7 @@ drivers.delete('/:id', async (req, res) => {
   if (result === 'missing') return res.status(404).json({ error: 'Motoboy ativo não encontrado' });
   if (result === 'busy') return res.status(409).json({ error: 'Encerre o turno e reatribua ou finalize as entregas abertas antes de remover o motoboy.' });
   disconnectDriver(id);
+  emitToAdmins('driver:updated', { id });
   res.status(204).end();
 });
 
@@ -74,6 +76,8 @@ drivers.patch('/:id/password', async (req, res) => {
   const changed = await prisma.user.updateMany({ where: { id, role: 'DRIVER', active: true }, data: { passwordHash } });
   if (!changed.count) return res.status(404).json({ error: 'Motoboy ativo não encontrado' });
   disconnectDriver(id);
+  emitToAdmins('driver:updated', { id });
   res.status(204).end();
 });
+
 

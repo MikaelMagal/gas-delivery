@@ -19,7 +19,7 @@ export function createApp() {
   app.disable('x-powered-by');
   app.set('trust proxy', config.trustProxy);
   app.use(helmet({
-    contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], scriptSrc: ["'self'"], styleSrc: ["'self'"], fontSrc: ["'self'"], imgSrc: ["'self'", 'data:', 'https://tile.openstreetmap.org'], styleSrcAttr: ["'unsafe-inline'"], connectSrc: ["'self'"], frameAncestors: ["'none'"], upgradeInsecureRequests: config.production ? [] : null } },
+    contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], scriptSrc: ["'self'"], styleSrc: ["'self'"], fontSrc: ["'self'"], imgSrc: ["'self'", 'data:', 'https://tile.openstreetmap.org'], styleSrcAttr: ["'unsafe-inline'"], connectSrc: ["'self'", ...config.origins.map(origin => origin.replace(/^http/, 'ws'))], frameAncestors: ["'none'"], upgradeInsecureRequests: config.production ? [] : null } },
     strictTransportSecurity: config.production ? { maxAge: 31536000 } : false,
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   }));
@@ -61,5 +61,6 @@ export function createApp() {
   });
   return app;
 }
+
 
 

@@ -393,3 +393,6 @@ td .detail-button { display: block; padding: 6px 0; }
 .map-driver-filter { display: grid; gap: 8px; max-width: 360px; font-weight: 600; }
 .map-driver-filter select { padding: 12px; border: 1px solid #dedee4; border-radius: 8px; background: white; }
 @media (max-width: 600px) { .route-panel { padding: 16px; } .delivery-map { height: 300px; } }
+.live-status { font-size: 12px; color: #52616b; padding: 9px 12px; background: #eef2f6; border-radius: 8px; margin: 0 0 18px; }
+.live-connected { color: #166534; background: #f0fdf4; }
+.live-offline, .live-reconnecting { color: #92400e; background: #fffbeb; }

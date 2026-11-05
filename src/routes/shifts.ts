@@ -1,7 +1,7 @@
 ﻿import { Router } from 'express';
 import { prisma } from '../prisma';
 import { auth, requireRole } from '../auth';
-import { emitToAdmins } from '../realtime';
+import { emitToAdmins, emitToDriver } from '../realtime';
 
 export const shifts = Router();
 shifts.use(auth, requireRole('DRIVER'));
@@ -20,6 +20,7 @@ shifts.post('/start', async (req, res) => {
     return { open, shift };
   }, { isolationLevel: 'Serializable' });
   emitToAdmins('driver:shift', { driverId, active: true });
+  emitToDriver(driverId, 'driver:shift', { driverId, active: true });
   res.status(open ? 200 : 201).json(shift);
 });
 
@@ -28,9 +29,12 @@ shifts.post('/end', async (req, res) => {
   await prisma.$transaction([
     prisma.shift.updateMany({ where: { driverId, endedAt: null }, data: { endedAt: new Date() } }),
     prisma.delivery.updateMany({ where: { driverId, status: 'EN_ROUTE' }, data: { status: 'PENDING' } }),
-  ]);
+  ], { isolationLevel: 'Serializable' });
   emitToAdmins('driver:shift', { driverId, active: false });
+  emitToDriver(driverId, 'driver:shift', { driverId, active: false });
   res.status(204).end();
 });
+
+
 
 
