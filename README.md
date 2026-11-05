@@ -176,3 +176,5 @@ npm run lint
 ## Publicação na Railway
 
 O caminho recomendado para testar sem comprar domínio está em [deploy/RAILWAY.md](deploy/RAILWAY.md). Foram preparados Dockerfile, railway.json, pré-deploy com migrations/seed de produção e healthcheck. O domínio/HTTPS são fornecidos pela Railway. Backend e frontend ficam no mesmo serviço, PostgreSQL privado em serviço separado. A aplicação agora aceita TRUST_PROXY=1 e pode derivar a origem permitida de RAILWAY_PUBLIC_DOMAIN. Nenhum serviço foi publicado e nenhum banco foi alterado durante essa preparação.
+
+Para Render + Neon, use [deploy/RENDER.md](deploy/RENDER.md). O Docker Command correto é `node scripts/render-start.cjs`, sem aspas ou operadores de shell. Esse script prepara o banco e inicia o servidor; a configuração Railway continua independente.
