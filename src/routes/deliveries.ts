@@ -15,12 +15,12 @@ const visibleNow = () => ({
 });
 
 const createSchema = z.object({
-  customerName: z.string().min(1),
+  customerName: z.string().trim().min(1),
   phone: z.string().optional(),
-  address: z.string().min(5),
+  address: z.string().trim().min(5),
   lat: z.number().min(-90).max(90),   // vem da geocodificação feita no painel
   lng: z.number().min(-180).max(180),
-  product: z.string().min(1),
+  product: z.string().trim().min(1),
   quantity: z.number().int().positive().default(1),
   notes: z.string().optional(),
   driverId: z.string().trim().min(1).optional(),
@@ -62,33 +62,69 @@ deliveries.get('/mine', requireRole('DRIVER'), async (req, res) => {
   res.json(list);
 });
 
-// ADMIN: edita, reatribui, reordena ou cancela
+// ADMIN: audit and the update are committed together; stale forms are rejected.
+const snapshot = (value: unknown) => JSON.parse(JSON.stringify(value));
 deliveries.patch('/:id', requireRole('ADMIN'), async (req, res) => {
-  const data = createSchema
-    .partial()
-    .extend({ status: z.enum(['PENDING', 'CANCELED']).optional() })
-    .parse(req.body);
+  const { expectedUpdatedAt, ...data } = createSchema.omit({ quantity: true, sortOrder: true }).partial().extend({
+    quantity: z.number().int().positive().optional(),
+    sortOrder: z.number().int().optional(),
+    status: z.enum(['PENDING', 'CANCELED']).optional(),
+    expectedUpdatedAt: z.string().datetime().optional(),
+  }).strict().parse(req.body);
+  if (!Object.keys(data).length) return res.status(400).json({ error: 'Informe os campos a alterar' });
   const id = String(req.params.id);
-  const d = await prisma.$transaction(async (tx) => {
+  const d = await prisma.$transaction(async tx => {
+    const before = await tx.delivery.findUnique({ where: { id } });
+    if (!before) return null;
+    if (expectedUpdatedAt && before.updatedAt.toISOString() !== expectedUpdatedAt) throw Object.assign(new Error('A entrega foi alterada. Feche o formulário, atualize a lista e tente novamente.'), { status: 409 });
+    if (data.driverId !== undefined && before.status !== 'PENDING') throw Object.assign(new Error('Só é possível atribuir motoboy a entregas pendentes'), { status: 409 });
+    if (data.status && data.status !== before.status && ['DELIVERED', 'CANCELED'].includes(before.status)) throw Object.assign(new Error('Use Reabrir entrega para alterar uma entrega finalizada.'), { status: 409 });
+    if (before.status === 'DELIVERED' && ((data.address !== undefined && data.address !== before.address) || (data.lat !== undefined && data.lat !== before.lat) || (data.lng !== undefined && data.lng !== before.lng))) throw Object.assign(new Error('Reabra a entrega antes de alterar o endereço ou a localização do comprovante.'), { status: 409 });
+    if (data.address !== undefined && data.address !== before.address && (data.lat === undefined || data.lng === undefined)) throw Object.assign(new Error('Ao alterar o endereço, informe também as coordenadas confirmadas.'), { status: 400 });
     if (data.driverId !== undefined) {
       const driver = await tx.user.findFirst({ where: { id: data.driverId, role: 'DRIVER', active: true }, select: { id: true } });
       if (!driver) throw Object.assign(new Error('Selecione um motoboy ativo válido'), { status: 400 });
-      // Conditional write also protects against a driver starting/completing this delivery concurrently.
-      const changed = await tx.delivery.updateMany({ where: { id, status: 'PENDING' }, data });
-      if (!changed.count) return null;
-      return tx.delivery.findUniqueOrThrow({ where: { id } });
     }
-    return tx.delivery.update({ where: { id }, data });
+    const changed = await tx.delivery.updateMany({ where: { id, updatedAt: before.updatedAt, status: before.status }, data });
+    if (!changed.count) throw Object.assign(new Error('A entrega mudou durante a edição. Atualize e tente novamente.'), { status: 409 });
+    const after = await tx.delivery.findUniqueOrThrow({ where: { id } });
+    await tx.deliveryChange.create({ data: { deliveryId: id, actorId: req.user!.id, action: 'EDIT', before: snapshot(before), after: snapshot(after) } });
+    return after;
   }, { isolationLevel: 'Serializable' });
-  if (!d) {
-    const exists = await prisma.delivery.findUnique({ where: { id }, select: { id: true } });
-    return res.status(exists ? 409 : 404).json({ error: exists ? 'Só é possível atribuir motoboy a entregas pendentes' : 'Entrega não encontrada' });
-  }
+  if (!d) return res.status(404).json({ error: 'Entrega não encontrada' });
   if (d.driverId) emitToDriver(d.driverId, 'delivery:assigned', d);
   emitToAdmins('delivery:updated', d);
   res.json(d);
 });
 
+deliveries.post('/:id/reopen', requireRole('ADMIN'), async (req, res) => {
+  const { reason, expectedUpdatedAt } = z.object({ reason: z.string().trim().min(5).max(500), expectedUpdatedAt: z.string().datetime().optional() }).strict().parse(req.body);
+  const id = String(req.params.id);
+  const d = await prisma.$transaction(async tx => {
+    const before = await tx.delivery.findUnique({ where: { id } });
+    if (!before) return null;
+    if (expectedUpdatedAt && before.updatedAt.toISOString() !== expectedUpdatedAt) throw Object.assign(new Error('A entrega foi alterada. Atualize antes de reabrir.'), { status: 409 });
+    if (!['DELIVERED', 'CANCELED'].includes(before.status)) throw Object.assign(new Error('Somente entregas concluídas ou canceladas podem ser reabertas.'), { status: 409 });
+    const driver = before.driverId ? await tx.user.findFirst({ where: { id: before.driverId, role: 'DRIVER', active: true }, select: { id: true } }) : null;
+    const changed = await tx.delivery.updateMany({ where: { id, status: before.status, updatedAt: before.updatedAt }, data: {
+      status: 'PENDING', driverId: driver?.id ?? null, deliveredAt: null, deliveredLat: null, deliveredLng: null, deliveredDistanceM: null,
+    } });
+    if (!changed.count) throw Object.assign(new Error('A entrega mudou. Atualize antes de reabrir.'), { status: 409 });
+    const after = await tx.delivery.findUniqueOrThrow({ where: { id } });
+    await tx.deliveryChange.create({ data: { deliveryId: id, actorId: req.user!.id, action: 'REOPEN', reason, before: snapshot(before), after: snapshot(after) } });
+    return after;
+  }, { isolationLevel: 'Serializable' });
+  if (!d) return res.status(404).json({ error: 'Entrega não encontrada' });
+  if (d.driverId) emitToDriver(d.driverId, 'delivery:assigned', d);
+  emitToAdmins('delivery:updated', d);
+  res.json(d);
+});
+
+deliveries.get('/:id/history', requireRole('ADMIN'), async (req, res) => {
+  const id = String(req.params.id);
+  if (!await prisma.delivery.findUnique({ where: { id }, select: { id: true } })) return res.status(404).json({ error: 'Entrega não encontrada' });
+  res.json(await prisma.deliveryChange.findMany({ where: { deliveryId: id }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 100, include: { actor: { select: { id: true, name: true } } } }));
+});
 const findOwn = (id: string, driverId: string) => prisma.delivery.findFirst({ where: { id, driverId } });
 
 // DRIVER: escolheu esta parada ("Ir para esta parada")
@@ -157,4 +193,6 @@ deliveries.post('/:id/complete', requireRole('DRIVER'), async (req, res) => {
   if (result.nextDelivery) emitToAdmins('delivery:updated', result.nextDelivery);
   res.json({ ...result.delivery, nextDelivery: result.nextDelivery });
 });
+
+
 

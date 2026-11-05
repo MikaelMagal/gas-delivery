@@ -1,14 +1,15 @@
-﻿import { useEffect, useRef, useState } from 'react'
+﻿import type { Delivery } from './types'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 
 import { emptyDraft, parseDeliveryDraft } from './deliveryForm'
 import type { DeliveryDraft } from './deliveryForm'
 
-type Props = { onClose: () => void; onCreated: () => void; onLogout: (message?: string) => void }
-export default function NewDeliveryForm({ onClose, onCreated, onLogout }: Props) {
+type Props = { delivery?: Delivery; onClose: () => void; onCreated: () => void; onLogout: (message?: string) => void }
+export default function NewDeliveryForm({ delivery, onClose, onCreated, onLogout }: Props) {
   const dialog = useRef<HTMLDialogElement>(null)
   const submitting = useRef(false)
-  const [draft, setDraft] = useState<DeliveryDraft>({ ...emptyDraft })
+  const [draft, setDraft] = useState<DeliveryDraft>(() => delivery ? { customerName: delivery.customerName, phone: delivery.phone || '', address: delivery.address, product: delivery.product, quantity: String(delivery.quantity), notes: delivery.notes || '', lat: String(delivery.lat), lng: String(delivery.lng) } : { ...emptyDraft })
   const [manual, setManual] = useState(false)
   const [searching, setSearching] = useState(false)
   const [results, setResults] = useState<{ address: string; lat: number; lng: number }[]>([])
@@ -58,10 +59,10 @@ export default function NewDeliveryForm({ onClose, onCreated, onLogout }: Props)
     submitting.current = true
     setSaving(true)
     try {
-      const response = await fetch('/api/deliveries', {
-        method: 'POST',
+      const response = await fetch(delivery ? `/api/deliveries/${encodeURIComponent(delivery.id)}` : '/api/deliveries', {
+        method: delivery ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(delivery ? { ...payload, phone: draft.phone.trim(), notes: draft.notes.trim(), expectedUpdatedAt: delivery.updatedAt } : payload),
       })
       if (response.status === 401) { onLogout('Sua sessão expirou. Entre novamente.'); return }
       if (response.status === 403) throw new Error('Seu perfil não tem permissão para cadastrar entregas.')
@@ -75,14 +76,14 @@ export default function NewDeliveryForm({ onClose, onCreated, onLogout }: Props)
     } finally { submitting.current = false; setSaving(false) }
   }
   return <dialog ref={dialog} className="delivery-dialog new-delivery-dialog" aria-labelledby="new-delivery-title" onCancel={event => { event.preventDefault(); if (!submitting.current) onClose() }}>
-    <div className="dialog-heading"><h2 id="new-delivery-title">Nova entrega</h2><button type="button" className="secondary-button" disabled={saving} onClick={onClose}>Fechar</button></div>
-    <p className="form-help">Preencha os dados do pedido. Campos com * são obrigatórios.</p>
+    <div className="dialog-heading"><h2 id="new-delivery-title">{delivery ? 'Editar entrega' : 'Nova entrega'}</h2><button type="button" className="secondary-button" disabled={saving} onClick={onClose}>Fechar</button></div>
+    <p className="form-help">{delivery?.status === 'DELIVERED' && 'Para corrigir endereço ou localização de uma entrega concluída, reabra a entrega primeiro. '}Preencha os dados do pedido. Campos com * são obrigatórios.</p>
     <form onSubmit={submit} aria-busy={saving}>
       <fieldset disabled={saving} className="delivery-form-fields">
         <label htmlFor="customer-name">Cliente *</label><input autoFocus id="customer-name" autoComplete="name" required value={draft.customerName} onChange={e => field('customerName', e.target.value)} />
         <label htmlFor="customer-phone">Telefone</label><input id="customer-phone" type="tel" autoComplete="tel" value={draft.phone} onChange={e => field('phone', e.target.value)} />
-        <label htmlFor="delivery-address">Endereço completo *</label><input id="delivery-address" autoComplete="street-address" required minLength={5} value={draft.address} onChange={e => field('address', e.target.value)} />
-        <button type="button" className="secondary-button" disabled={searching} onClick={() => void searchAddress()}>{searching ? 'Buscando…' : 'Buscar endereço'}</button>
+        <label htmlFor="delivery-address">Endereço completo *</label><input id="delivery-address" readOnly={delivery?.status === 'DELIVERED'} autoComplete="street-address" required minLength={5} value={draft.address} onChange={e => field('address', e.target.value)} />
+        <button type="button" className="secondary-button" disabled={searching || delivery?.status === 'DELIVERED'} onClick={() => void searchAddress()}>{searching ? 'Buscando…' : 'Buscar endereço'}</button>
         <p className="form-help">Inclua número, bairro, cidade e estado. Confira o resultado antes de selecionar; a localização pode ser aproximada.</p>
         {results.length > 0 && <div className="address-results" aria-label="Endereços encontrados">{results.map((result, index) => <button type="button" className="secondary-button" key={index} onClick={() => {
           setDraft(previous => ({ ...previous, lat: String(result.lat), lng: String(result.lng) }))
@@ -96,14 +97,15 @@ export default function NewDeliveryForm({ onClose, onCreated, onLogout }: Props)
         <button type="button" className="secondary-button" aria-expanded={manual} onClick={() => setManual(value => !value)}>{manual ? 'Ocultar coordenadas manuais' : 'Usar ou ajustar coordenadas manualmente'}</button>
         {manual && <>
         <p className="form-help" id="coordinates-help">Alternativa manual: informe as coordenadas do destino. Aceita ponto ou vírgula decimal.</p>
-        <div className="coordinate-fields"><div><label htmlFor="delivery-lat">Latitude *</label><input id="delivery-lat" type="text" inputMode="decimal" required={manual} placeholder="Ex.: -23.5505" aria-describedby="coordinates-help" value={draft.lat} onChange={e => field('lat', e.target.value)} /></div><div><label htmlFor="delivery-lng">Longitude *</label><input id="delivery-lng" type="text" inputMode="decimal" required={manual} placeholder="Ex.: -46.6333" aria-describedby="coordinates-help" value={draft.lng} onChange={e => field('lng', e.target.value)} /></div></div>
+        <div className="coordinate-fields"><div><label htmlFor="delivery-lat">Latitude *</label><input id="delivery-lat" readOnly={delivery?.status === 'DELIVERED'} type="text" inputMode="decimal" required={manual} placeholder="Ex.: -23.5505" aria-describedby="coordinates-help" value={draft.lat} onChange={e => field('lat', e.target.value)} /></div><div><label htmlFor="delivery-lng">Longitude *</label><input id="delivery-lng" readOnly={delivery?.status === 'DELIVERED'} type="text" inputMode="decimal" required={manual} placeholder="Ex.: -46.6333" aria-describedby="coordinates-help" value={draft.lng} onChange={e => field('lng', e.target.value)} /></div></div>
         </>}
       </fieldset>
       {error && <div className="error-message" role="alert">{error}</div>}
-      <div className="form-actions"><button type="button" className="secondary-button" disabled={saving} onClick={onClose}>Cancelar</button><button type="submit" className="primary-button" disabled={saving || searching}>{saving ? 'Salvando…' : 'Cadastrar entrega'}</button></div>
+      <div className="form-actions"><button type="button" className="secondary-button" disabled={saving} onClick={onClose}>Cancelar</button><button type="submit" className="primary-button" disabled={saving || searching}>{saving ? 'Salvando…' : delivery ? 'Salvar alterações' : 'Cadastrar entrega'}</button></div>
     </form>
   </dialog>
 }
+
 
 
 

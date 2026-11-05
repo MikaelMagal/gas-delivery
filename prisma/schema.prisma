@@ -28,6 +28,7 @@ model User {
   active       Boolean    @default(true)
   createdAt    DateTime   @default(now())
 
+  deliveryChanges DeliveryChange[]
   deliveries   Delivery[]
   locations    Location[]
   shifts       Shift[]
@@ -58,6 +59,8 @@ model Delivery {
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
 
+  changes DeliveryChange[]
+
   @@index([driverId, status])
 }
 
@@ -81,4 +84,19 @@ model Shift {
   endedAt   DateTime?
 
   @@index([driverId, endedAt])
+}
+
+model DeliveryChange {
+  id         String   @id @default(cuid())
+  deliveryId String
+  delivery   Delivery @relation(fields: [deliveryId], references: [id])
+  actorId    String
+  actor      User     @relation(fields: [actorId], references: [id])
+  action     String
+  reason     String?
+  before     Json
+  after      Json
+  createdAt  DateTime @default(now())
+
+  @@index([deliveryId, createdAt])
 }

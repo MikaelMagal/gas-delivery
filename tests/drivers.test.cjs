@@ -42,8 +42,8 @@ test('drivers and assignment: role checks, registration, validation and pending-
     return where.id === 'driver' ? { id: 'driver' } : null;
   };
   prisma.delivery.create = async () => { created++; return target; };
-  prisma.delivery.findUnique = async ({ where }) => where.id === 'missing' ? null : { id: where.id };
-  prisma.$transaction = async callback => callback({ user: prisma.user, delivery: { create: (...args) => prisma.delivery.create(...args),
+  prisma.delivery.findUnique = async ({ where }) => where.id === 'missing' ? null : { ...target, status: currentStatus, updatedAt: new Date('2026-11-05T12:00:00.000Z') };
+  prisma.$transaction = async callback => callback({ user: prisma.user, deliveryChange: { create: async () => ({}) }, delivery: { findUnique: (...args) => prisma.delivery.findUnique(...args), create: (...args) => prisma.delivery.create(...args),
     updateMany: async ({ where }) => {
       assert.equal(where.status, 'PENDING');
       if (currentStatus !== 'PENDING' || where.id === 'missing') return { count: 0 };
@@ -87,5 +87,6 @@ test('drivers and assignment: role checks, registration, validation and pending-
     await prisma.$disconnect();
   }
 });
+
 
 
