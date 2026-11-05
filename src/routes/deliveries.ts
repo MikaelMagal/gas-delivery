@@ -1,4 +1,5 @@
-﻿import { Router } from 'express';
+﻿import { reportQuery, reportWindow } from '../deliveryReport';
+import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma';
 import { auth, requireRole } from '../auth';
@@ -53,6 +54,29 @@ deliveries.get('/', requireRole('ADMIN'), async (req, res) => {
   res.json(list);
 });
 
+// ADMIN: historical reporting is separate from today's operational list.
+deliveries.get('/report', requireRole('ADMIN'), async (req, res) => {
+  const query = reportQuery.parse(req.query);
+  const window = reportWindow(query.from, query.to);
+  const where = {
+    [query.dateBy]: window,
+    ...(query.status ? { status: query.status } : {}),
+    ...(query.driverId ? { driverId: query.driverId } : {}),
+    ...(query.search ? { OR: ['customerName', 'address', 'product'].map(field => ({ [field]: { contains: query.search, mode: 'insensitive' as const } })) } : {}),
+  };
+  const result = await prisma.$transaction(async tx => {
+    const total = await tx.delivery.count({ where });
+    const page = Math.min(query.page, Math.max(1, Math.ceil(total / query.pageSize)));
+    const items = await tx.delivery.findMany({
+      where, orderBy: [{ [query.dateBy]: 'desc' }, { id: 'desc' }],
+      skip: (page - 1) * query.pageSize, take: query.pageSize,
+      include: { driver: { select: { id: true, name: true } } },
+    });
+    const drivers = await tx.user.findMany({ where: { role: 'DRIVER' }, select: { id: true, name: true, active: true }, orderBy: [{ name: 'asc' }, { id: 'asc' }] });
+    return { items, total, drivers, page };
+  }, { isolationLevel: 'RepeatableRead' });
+  res.json({ ...result, pageSize: query.pageSize, totalPages: Math.ceil(result.total / query.pageSize), timezone: 'UTC-03:00' });
+});
 // DRIVER: minhas paradas (precisa vir antes de '/:id')
 deliveries.get('/mine', requireRole('DRIVER'), async (req, res) => {
   const list = await prisma.delivery.findMany({
@@ -193,6 +217,8 @@ deliveries.post('/:id/complete', requireRole('DRIVER'), async (req, res) => {
   if (result.nextDelivery) emitToAdmins('delivery:updated', result.nextDelivery);
   res.json({ ...result.delivery, nextDelivery: result.nextDelivery });
 });
+
+
 
 
 

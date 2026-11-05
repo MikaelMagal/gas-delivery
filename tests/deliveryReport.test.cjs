@@ -1,0 +1,61 @@
+﻿const test = require('node:test');
+const assert = require('node:assert/strict');
+process.env.JWT_SECRET = 'test-report-secret';
+const express = require('express');
+const { ZodError } = require('zod');
+const { prisma } = require('../dist/prisma');
+const { signToken } = require('../dist/auth');
+const { deliveries } = require('../dist/routes/deliveries');
+const { reportWindow } = require('../dist/deliveryReport');
+test('report dates cover full Brasilia days, validate dates and limit periods', () => {
+  const window = reportWindow('2026-11-01', '2026-11-05');
+  assert.equal(window.gte.toISOString(), '2026-11-01T03:00:00.000Z');
+  assert.equal(window.lt.toISOString(), '2026-11-06T03:00:00.000Z');
+  assert.equal(reportWindow('2026-11-05', '2026-11-05').lt - reportWindow('2026-11-05', '2026-11-05').gte, 86400000);
+  assert.throws(() => reportWindow('2026-02-31', '2026-03-01'));
+  assert.throws(() => reportWindow('2026-11-06', '2026-11-05'));
+  assert.throws(() => reportWindow('2020-01-01', '2026-11-05'));
+});
+test('admin reports: auth, historical dates, filters, pagination and inactive driver names', async () => {
+  prisma.user.findUnique = async ({ where }) => ({ id: where.id, role: where.id === 'admin' ? 'ADMIN' : 'DRIVER', active: true, passwordHash: 'hash' });
+  let query;
+  let total = 26;
+  let writes = 0;
+  const row = { id: 'historical', customerName: 'Cliente', status: 'DELIVERED', driver: { id: 'inactive', name: 'Motoboy antigo' }, deliveredAt: '2026-10-10T13:45:00.000Z' };
+  prisma.delivery.count = async ({ where }) => { query = where; return total; };
+  prisma.delivery.findMany = async args => { query = { ...query, request: args }; return total ? [row] : []; };
+  prisma.delivery.update = async () => { writes++; };
+  prisma.user.findMany = async ({ where, select }) => {
+    assert.deepEqual(where, { role: 'DRIVER' });
+    assert.deepEqual(select, { id: true, name: true, active: true });
+    return [{ id: 'inactive', name: 'Motoboy antigo', active: false }];
+  };
+  prisma.$transaction = async callback => callback(prisma);
+  const app = express(); app.use('/deliveries', deliveries);
+  app.use((err, req, res, next) => res.status(err instanceof ZodError ? 400 : err.status || 500).json({ error: 'invalid' }));
+  const server = app.listen(0, '127.0.0.1'); await new Promise(resolve => server.once('listening', resolve));
+  const base = `http://127.0.0.1:${server.address().port}/deliveries/report`;
+  const call = (params, role = 'ADMIN') => fetch(`${base}?${params}`, { headers: { Authorization: `Bearer ${signToken({ id: role === 'ADMIN' ? 'admin' : 'driver', role }, 'hash')}` } });
+  try {
+    assert.equal((await fetch(base)).status, 401);
+    assert.equal((await call('from=2026-10-01&to=2026-10-31', 'DRIVER')).status, 403);
+    for (const params of ['from=2026-02-31&to=2026-03-01', 'from=2026-10-01&to=2026-10-31&pageSize=101', 'from=2026-10-01&to=2026-10-31&dateBy=passwordHash']) assert.equal((await call(params)).status, 400);
+    const response = await call('from=2026-10-01&to=2026-10-31&status=DELIVERED&driverId=inactive&search=Cliente&page=2');
+    assert.equal(response.status, 200);
+    const data = await response.json();
+    assert.equal(data.total, 26); assert.equal(data.totalPages, 2); assert.equal(data.page, 2);
+    assert.equal(data.items[0].driver.name, 'Motoboy antigo'); assert.equal(data.drivers[0].active, false);
+    assert.equal(query.deliveredAt.gte.toISOString(), '2026-10-01T03:00:00.000Z');
+    assert.equal(query.deliveredAt.lt.toISOString(), '2026-11-01T03:00:00.000Z');
+    assert.equal(query.createdAt, undefined); assert.equal(query.status, 'DELIVERED'); assert.equal(query.driverId, 'inactive'); assert.equal(query.OR[0].customerName.contains, 'Cliente');
+    assert.equal(query.request.skip, 25); assert.equal(query.request.take, 25);
+    assert.deepEqual(query.request.include.driver.select, { id: true, name: true });
+    assert.equal((await call('from=2026-11-05&to=2026-11-04')).status, 409);
+    assert.equal((await call('from=2020-01-01&to=2026-11-04')).status, 409);
+    total = 0;
+    const empty = await (await call('from=2026-10-01&to=2026-10-31&dateBy=createdAt&page=9')).json();
+    assert.deepEqual(empty.items, []); assert.equal(empty.page, 1);
+    assert.ok(query.createdAt); assert.equal(query.deliveredAt, undefined);
+    assert.equal(writes, 0);
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await prisma.$disconnect(); }
+});
