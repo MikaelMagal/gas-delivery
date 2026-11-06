@@ -67,6 +67,20 @@ test('admin delivery corrections preserve prior proof, require authorization and
     assert.equal(rows[2].beforeDriverName, 'João Entregador');
     assert.equal(rows[2].afterDriverName, null);
     assert.equal((await call('/missing/history', 'GET')).status, 404);
+    d.status = 'EN_ROUTE';
+    assert.equal((await call('/delivery', 'PATCH', { status: 'CANCELED' })).status, 409);
+    d.status = 'DELIVERED';
+    assert.equal((await call('/delivery', 'PATCH', { status: 'CANCELED' })).status, 409);
+    d.status = 'PENDING';
+    assert.equal((await call('/delivery', 'PATCH', { status: 'CANCELED' }, 'DRIVER')).status, 403);
+    assert.equal((await call('/delivery', 'PATCH', { status: 'CANCELED', expectedUpdatedAt: '2020-01-01T00:00:00.000Z' })).status, 409);
+    const previousCount = history.length;
+    assert.equal((await call('/delivery', 'PATCH', { status: 'CANCELED', expectedUpdatedAt: d.updatedAt.toISOString() })).status, 200);
+    assert.equal(d.status, 'CANCELED');
+    assert.equal(history.length, previousCount + 1);
+    assert.equal(history.at(-1).before.status, 'PENDING');
+    assert.equal(history.at(-1).after.status, 'CANCELED');
+    assert.equal(history.at(-1).actorId, 'admin');
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await prisma.$disconnect(); }
 });
 

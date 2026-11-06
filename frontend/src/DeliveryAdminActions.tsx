@@ -4,6 +4,25 @@ import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { Delivery } from './types'
 type Props = { delivery: Delivery; onClose: () => void; onDone: () => void; onLogout: (message?: string) => void }
+export function CancelDelivery({ delivery, onClose, onDone, onLogout }: Props) {
+  const dialog = useRef<HTMLDialogElement>(null)
+  const lock = useRef(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  useEffect(() => { dialog.current?.showModal() }, [])
+  async function cancel() {
+    if (lock.current) return
+    lock.current = true; setSaving(true); setError('')
+    try {
+      const response = await fetch(`/api/deliveries/${encodeURIComponent(delivery.id)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'CANCELED', expectedUpdatedAt: delivery.updatedAt }) })
+      if (response.status === 401) { onLogout('Sua sessão expirou. Entre novamente.'); return }
+      if (!response.ok) { const data = await response.json().catch(() => null); throw new Error(data?.error || 'Não foi possível cancelar a entrega.') }
+      onDone()
+    } catch (err) { setError(err instanceof TypeError ? 'Falha de conexão. Atualize a lista antes de repetir: o cancelamento pode ter sido registrado.' : err instanceof Error ? err.message : 'Falha ao cancelar.') }
+    finally { lock.current = false; setSaving(false) }
+  }
+  return <dialog ref={dialog} className="delivery-dialog" aria-labelledby="cancel-title" onCancel={event => { event.preventDefault(); if (!lock.current) onClose() }}><h2 id="cancel-title">Cancelar entrega de {delivery.customerName}?</h2><p>{delivery.address}</p><p>A entrega será retirada das pendências do motoboy e ficará registrada como cancelada. O administrador poderá reabri-la se necessário.</p>{error && <p role="alert" className="error-message">{error}</p>}<div className="form-actions"><button autoFocus className="secondary-button" disabled={saving} onClick={onClose}>Voltar</button><button className="primary-button" disabled={saving} onClick={() => void cancel()}>{saving ? 'Cancelando…' : 'Confirmar cancelamento'}</button></div></dialog>
+}
 export function ReopenDelivery({ delivery, onClose, onDone, onLogout }: Props) {
   const dialog = useRef<HTMLDialogElement>(null)
   const busy = useRef(false)
@@ -31,6 +50,7 @@ type Change = { beforeDriverName: string | null; afterDriverName: string | null;
 const names: Record<string, string> = { customerName: 'Cliente', phone: 'Telefone', address: 'Endereço', product: 'Produto', quantity: 'Quantidade', notes: 'Observações', lat: 'Latitude', lng: 'Longitude', status: 'Status', driverId: 'Motoboy', sortOrder: 'Ordem', deliveredAt: 'Conclusão em', deliveredLat: 'Latitude da confirmação', deliveredLng: 'Longitude da confirmação', deliveredDistanceM: 'Distância da confirmação (m)' }
 function changeTitle(change: Change) {
   if (change.action === 'REOPEN') return 'Reabertura'
+  if (change.before.status !== 'CANCELED' && change.after.status === 'CANCELED') return 'Cancelamento'
   const before = change.before.driverId ?? null
   const after = change.after.driverId ?? null
   if (before !== after) return !after ? 'Remoção de atribuição' : !before ? 'Atribuição' : 'Troca de motoboy'

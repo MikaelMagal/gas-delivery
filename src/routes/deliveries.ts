@@ -99,6 +99,7 @@ deliveries.patch('/:id', requireRole('ADMIN'), async (req, res) => {
     const before = await tx.delivery.findUnique({ where: { id } });
     if (!before) return null;
     previousDriverId = before.driverId;
+    if (data.status === 'CANCELED' && before.status !== 'PENDING') throw Object.assign(new Error('Só é possível cancelar entregas pendentes.'), { status: 409 });
     if (expectedUpdatedAt && before.updatedAt.toISOString() !== expectedUpdatedAt) throw Object.assign(new Error('A entrega foi alterada. Feche o formulário, atualize a lista e tente novamente.'), { status: 409 });
     if (data.driverId !== undefined && before.status !== 'PENDING') throw Object.assign(new Error('Só é possível atribuir motoboy a entregas pendentes'), { status: 409 });
     if (data.status && data.status !== before.status && ['DELIVERED', 'CANCELED'].includes(before.status)) throw Object.assign(new Error('Use Reabrir entrega para alterar uma entrega finalizada.'), { status: 409 });

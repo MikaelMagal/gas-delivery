@@ -18,6 +18,7 @@ O sistema precisa de internet. Não há modo offline, cadastro público de pedid
 
 ### Correções
 
+- **Cancelar entrega**: disponível apenas para pendentes, na lista e no histórico de entregas. Confira o cliente e confirme o cancelamento. A entrega sai das pendências do motoboy e permanece registrada como cancelada, com a alteração no histórico. Para desfazer, use **Reabrir entrega**. Se já estiver em rota, combine com o motoboy a devolução a pendente antes de cancelar.
 - **Editar entrega**: corrige os dados. Se outra alteração ocorrer enquanto o formulário está aberto, feche, atualize e abra novamente antes de salvar.
 - **Trocar motoboy**: disponível para entrega pendente. Se estiver em rota, combine com o motoboy uma troca de parada ou encerramento do turno, que devolve a parada atual a pendente. Depois confira a situação antes de reatribuir.
 - **Reabrir entrega**: para uma entrega concluída ou cancelada que precisa voltar a pendente. Informe o motivo real. Se o motoboy ainda estiver ativo, sua atribuição é mantida. A parada que já está em rota não é interrompida.
