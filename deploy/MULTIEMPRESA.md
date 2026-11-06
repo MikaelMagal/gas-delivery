@@ -92,6 +92,12 @@ A primeira suíte cria e remove um banco temporário dentro desse container para
 
 ## Recuperação
 
+### Começar do zero por decisão do responsável
+
+Com o serviço sem operações, confira o banco em `DATABASE_URL`, salve o `.env` com `PLATFORM_ADMIN_EMAIL` válido e senha de 12 caracteres a 72 bytes. Execute `node --env-file=.env scripts/check-platform-setup.cjs` para diagnóstico sem valores secretos. Corrija a conexão e aplique as migrations no banco escolhido antes da limpeza.
+
+`node --env-file=.env scripts/reset-platform.cjs` somente mostra contagens. Com `--confirm-delete-all`, apaga todas as empresas, contas, entregas, turnos, localizações e alterações e cria somente a conta global configurada. A operação é transacional, preserva schema/migrations e exige credenciais válidas antes de excluir. Não há recuperação dos dados removidos sem backup. Reinicie o serviço depois para desconectar sessões antigas. O seed atualizado não recria contas iniciais quando já existe conta global; publique essa versão para manter esse comportamento nos próximos deploys.
+
 Antes da migration, é possível voltar ao código da tag em um branch separado. Não use `git reset --hard` para recuperar, pois ele pode descartar trabalho local.
 
 ```powershell

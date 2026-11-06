@@ -4,6 +4,10 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
+  if (await prisma.user.count({ where: { role: 'PLATFORM_ADMIN' } })) {
+    console.log('Conta global já configurada. Seed não recria contas ou empresas iniciais.');
+    return;
+  }
   const production = process.env.NODE_ENV === 'production';
   if (production && (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD.length < 12 || process.env.ADMIN_PASSWORD === 'trocar123')) throw new Error('Configure credenciais administrativas fortes antes do seed de produção');
   const email = (process.env.ADMIN_EMAIL ?? 'admin@empresa.com').toLowerCase();
