@@ -9,6 +9,10 @@
 
 ## Modelo de acesso
 
+No painel global, **Salvar e-mail** altera o login de um administrador de loja, mantendo a senha e a empresa. O endereço é normalizado para minúsculas e deve ser exclusivo em toda a plataforma, inclusive entre contas desativadas. Avise o administrador sobre o novo login.
+
+**Remover empresa definitivamente** aparece para empresas desativadas. Exige digitar exatamente o nome e apaga contas, entregas, turnos, localizações e histórico daquela empresa em uma transação. Essa ação não pode ser desfeita sem backup. As outras empresas e a conta global são preservadas. Para apenas suspender o acesso, use a desativação.
+
 - **PLATFORM_ADMIN**: conta global dedicada, criada explicitamente por script. Cadastra empresas e seus administradores, ativa/desativa empresas e administradores e redefine senha de administradores. Para operar entregas e motoboys, escolhe uma empresa no painel global.
 - **ADMIN**: pertence a uma única empresa. Opera apenas seus motoboys, entregas, mapas e histórico. Não cria empresas ou outros administradores e não escolhe outra empresa.
 - **DRIVER**: pertence a uma única empresa e acessa apenas suas entregas. Seu e-mail é exclusivo na plataforma inteira, inclusive entre papéis. Para trabalhar em outra empresa nesta versão, precisa de uma conta com outro e-mail.

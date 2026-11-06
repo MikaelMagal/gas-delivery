@@ -31,11 +31,33 @@ platform.post('/companies/:id/admins', async (req, res) => {
   res.status(201).json(user);
 });
 platform.patch('/admins/:id', async (req, res) => {
-  const input = z.object({ active: z.boolean().optional(), password: password.optional() }).strict().refine(v => Object.keys(v).length > 0).parse(req.body);
+  const input = z.object({ active: z.boolean().optional(), password: password.optional(), email: z.string().trim().email().max(254).optional() }).strict().refine(v => Object.keys(v).length > 0).parse(req.body);
   const id = String(req.params.id);
-  const result = await db.user.updateMany({ where: { id, role: 'ADMIN' }, data: { ...(input.active !== undefined ? { active: input.active } : {}), ...(input.password ? { passwordHash: await bcrypt.hash(input.password, 10) } : {}) } });
+  const result = await db.user.updateMany({ where: { id, role: 'ADMIN' }, data: { ...(input.email ? { email: input.email.toLowerCase() } : {}), ...(input.active !== undefined ? { active: input.active } : {}), ...(input.password ? { passwordHash: await bcrypt.hash(input.password, 10) } : {}) } });
   if (!result.count) return res.status(404).json({ error: 'Administrador não encontrado' });
   disconnectDriver(id);
+  res.status(204).end();
+});
+platform.delete('/companies/:id', async (req, res) => {
+  const { confirmationName } = z.object({ confirmationName: z.string().min(1).max(160) }).strict().parse(req.body);
+  const id = String(req.params.id);
+  const users = await db.$transaction(async tx => {
+    const company = await tx.company.findUnique({ where: { id } });
+    if (!company) return null;
+    if (company.active) throw Object.assign(new Error('Desative a empresa antes de removê-la.'), { status: 409 });
+    if (company.name !== confirmationName) throw Object.assign(new Error('Digite exatamente o nome da empresa para confirmar a remoção.'), { status: 409 });
+    const users = await tx.user.findMany({ where: { companyId: id }, select: { id: true } });
+    await tx.deliveryChange.deleteMany({ where: { companyId: id } });
+    await tx.location.deleteMany({ where: { companyId: id } });
+    await tx.shift.deleteMany({ where: { companyId: id } });
+    await tx.delivery.deleteMany({ where: { companyId: id } });
+    await tx.user.deleteMany({ where: { companyId: id } });
+    await tx.company.delete({ where: { id } });
+    return users;
+  }, { isolationLevel: 'Serializable' });
+  if (!users) return res.status(404).json({ error: 'Empresa não encontrada' });
+  disconnectCompany(id);
+  for (const user of users) disconnectDriver(user.id);
   res.status(204).end();
 });
 platform.patch('/companies/:id', async (req, res) => {
