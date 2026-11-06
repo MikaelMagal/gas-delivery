@@ -1,10 +1,10 @@
-﻿const test = require('node:test');
+const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
 const jwt = require('jsonwebtoken');
 process.env.JWT_SECRET = 'socket-integration-secret';
 const { io: client } = require('../frontend/node_modules/socket.io-client');
-const { prisma } = require('../dist/prisma');
+const { prisma } = require('./helpers/companyMocks.cjs');
 const { signToken, credentialFor } = require('../dist/auth');
 const { initRealtime, publishDeliveryChange, disconnectDriver } = require('../dist/realtime');
 function event(socket, name, timeout = 4000) {

@@ -1,9 +1,9 @@
-﻿const test = require('node:test');
+const test = require('node:test');
 const assert = require('node:assert/strict');
 process.env.JWT_SECRET = 'test-report-secret';
 const express = require('express');
 const { ZodError } = require('zod');
-const { prisma } = require('../dist/prisma');
+const { prisma } = require('./helpers/companyMocks.cjs');
 const { signToken } = require('../dist/auth');
 const { deliveries } = require('../dist/routes/deliveries');
 const { reportWindow } = require('../dist/deliveryReport');

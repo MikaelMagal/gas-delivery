@@ -5,7 +5,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { ZodError } = require('zod');
-const { prisma } = require('../dist/prisma');
+const { prisma } = require('./helpers/companyMocks.cjs');
 const { credentialFor } = require('../dist/auth');
 prisma.user.findUnique = async ({ where }) => ({ id: where.id, role: where.id === 'driver-auth' ? 'DRIVER' : 'ADMIN', active: true, passwordHash: 'test-hash' });
 const realtime = require('../dist/realtime');

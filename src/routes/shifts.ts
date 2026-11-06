@@ -1,4 +1,5 @@
-﻿import { Router } from 'express';
+import { tenantId } from '../tenant';
+import { Router } from 'express';
 import { prisma } from '../prisma';
 import { auth, requireRole } from '../auth';
 import { emitToAdmins, emitToDriver } from '../realtime';
@@ -16,7 +17,7 @@ shifts.post('/start', async (req, res) => {
   const driverId = req.user!.id;
   const { open, shift } = await prisma.$transaction(async tx => {
     const open = await tx.shift.findFirst({ where: { driverId, endedAt: null } });
-    const shift = open ?? (await tx.shift.create({ data: { driverId } }));
+    const shift = open ?? (await tx.shift.create({ data: { driverId, companyId: tenantId() } }));
     return { open, shift };
   }, { isolationLevel: 'Serializable' });
   emitToAdmins('driver:shift', { driverId, active: true });

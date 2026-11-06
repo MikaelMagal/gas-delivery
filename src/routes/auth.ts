@@ -1,10 +1,10 @@
-﻿import { setSessionCookie, clearSessionCookie } from '../session';
+import { setSessionCookie, clearSessionCookie } from '../session';
 import { rateLimit } from 'express-rate-limit';
 import { auth } from '../auth';
 import { Router } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
-import { prisma } from '../prisma';
+import { systemPrisma as prisma } from '../prisma';
 import { signToken } from '../auth';
 
 export const authRoutes = Router();
@@ -20,15 +20,17 @@ authRoutes.post('/login', loginLimit, async (req, res) => {
     return res.status(401).json({ error: 'Credenciais inválidas' });
   }
 
-  setSessionCookie(res, signToken({ id: user.id, role: user.role }, user.passwordHash));
+  if (user.role !== 'PLATFORM_ADMIN' && (!user.companyId || !await prisma.company.findFirst({ where: { id: user.companyId, active: true }, select: { id: true } }))) return res.status(401).json({ error: 'Credenciais inválidas' });
+  setSessionCookie(res, signToken({ id: user.id, role: user.role, companyId: user.role === 'PLATFORM_ADMIN' ? null : user.companyId }, user.passwordHash));
   res.json({
-    user: { id: user.id, name: user.name, role: user.role },
+    user: { id: user.id, name: user.name, role: user.role, companyId: user.role === 'PLATFORM_ADMIN' ? null : user.companyId },
   });
 });
 
 
 authRoutes.post('/logout', (_req, res) => { clearSessionCookie(res); res.status(204).end(); });
 authRoutes.get('/me', auth, async (req, res) => {
-  const user = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { id: true, name: true, role: true } });
-  res.json({ user });
+  const user = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { id: true, name: true, role: true, companyId: true } });
+  const company = req.user!.companyId ? await prisma.company.findUnique({ where: { id: req.user!.companyId }, select: { name: true } }) : null;
+  res.json({ user: user ? { ...user, companyId: req.user!.companyId, companyName: company?.name } : null });
 });

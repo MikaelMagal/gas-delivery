@@ -8,6 +8,8 @@ O sistema precisa de internet. Não há modo offline, cadastro público de pedid
 
 ## Administrador
 
+Cada administrador de loja acessa apenas sua empresa. O e-mail de cada conta é exclusivo em toda a plataforma. A criação de empresas e administradores fica no painel global, conforme [MULTIEMPRESA.md](MULTIEMPRESA.md).
+
 1. Entre com sua conta administrativa.
 2. Em **Motoboys**, preencha nome, e-mail e senha inicial e clique em **Cadastrar motoboy**.
 3. Clique em **Nova entrega**. Informe cliente, telefone quando disponível, endereço completo com número, bairro, cidade e estado, produto, quantidade e observações.

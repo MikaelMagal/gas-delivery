@@ -1,4 +1,5 @@
-﻿import { reportQuery, reportWindow } from '../deliveryReport';
+import { tenantId } from '../tenant';
+import { reportQuery, reportWindow } from '../deliveryReport';
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma';
@@ -34,7 +35,7 @@ deliveries.post('/', requireRole('ADMIN'), async (req, res) => {
       const driver = await tx.user.findFirst({ where: { id: data.driverId, role: 'DRIVER', active: true }, select: { id: true } });
       if (!driver) throw Object.assign(new Error('Selecione um motoboy ativo válido'), { status: 400 });
     }
-    return tx.delivery.create({ data });
+    return tx.delivery.create({ data: { ...data, companyId: tenantId() } });
   }, { isolationLevel: 'Serializable' });
   publishDeliveryChange(d);
   res.status(201).json(d);
@@ -112,7 +113,7 @@ deliveries.patch('/:id', requireRole('ADMIN'), async (req, res) => {
     const changed = await tx.delivery.updateMany({ where: { id, updatedAt: before.updatedAt, status: before.status }, data });
     if (!changed.count) throw Object.assign(new Error('A entrega mudou durante a edição. Atualize e tente novamente.'), { status: 409 });
     const after = await tx.delivery.findUniqueOrThrow({ where: { id } });
-    await tx.deliveryChange.create({ data: { deliveryId: id, actorId: req.user!.id, action: 'EDIT', before: snapshot(before), after: snapshot(after) } });
+    await tx.deliveryChange.create({ data: { companyId: tenantId(), deliveryId: id, actorId: req.user!.id, action: 'EDIT', before: snapshot(before), after: snapshot(after) } });
     return after;
   }, { isolationLevel: 'Serializable' });
   if (!d) return res.status(404).json({ error: 'Entrega não encontrada' });
@@ -134,7 +135,7 @@ deliveries.post('/:id/reopen', requireRole('ADMIN'), async (req, res) => {
     } });
     if (!changed.count) throw Object.assign(new Error('A entrega mudou. Atualize antes de reabrir.'), { status: 409 });
     const after = await tx.delivery.findUniqueOrThrow({ where: { id } });
-    await tx.deliveryChange.create({ data: { deliveryId: id, actorId: req.user!.id, action: 'REOPEN', reason, before: snapshot(before), after: snapshot(after) } });
+    await tx.deliveryChange.create({ data: { companyId: tenantId(), deliveryId: id, actorId: req.user!.id, action: 'REOPEN', reason, before: snapshot(before), after: snapshot(after) } });
     return after;
   }, { isolationLevel: 'Serializable' });
   if (!d) return res.status(404).json({ error: 'Entrega não encontrada' });

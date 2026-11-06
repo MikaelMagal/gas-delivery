@@ -1,11 +1,11 @@
-﻿const { test } = require('node:test');
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 process.env.NODE_ENV = 'production';
 process.env.APP_ORIGINS = 'https://entregas.example.com';
 process.env.JWT_SECRET = 'a492cfd428b74a7e98314b7c8ead74589b5d0a8f33f2ec912';
 process.env.TRUST_PROXY = 'loopback';
 const bcrypt = require('bcryptjs');
-const { prisma } = require('../dist/prisma');
+const { prisma } = require('./helpers/companyMocks.cjs');
 const { createApp } = require('../dist/app');
 const { assertProductionAccounts } = require('../dist/production');
 test('web security: HTTPS, origin, HttpOnly cookie, identity, logout, CSP and login limit', async () => {
@@ -45,14 +45,14 @@ test('web security: HTTPS, origin, HttpOnly cookie, identity, logout, CSP and lo
     assert.equal(home.headers.get('x-powered-by'), null);
     const login = await call('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'driver@example.com', password: 'password-test123' }) });
     assert.equal(login.status, 200);
-    assert.deepEqual(await login.json(), { user: { id: 'driver', name: 'Nome', role: 'DRIVER' } });
+    assert.deepEqual(await login.json(), { user: { id: 'driver', name: 'Nome', role: 'DRIVER', companyId: 'test-company' } });
     const cookie = login.headers.get('set-cookie');
     for (const text of ['__Host-gas_session=', 'HttpOnly', 'Secure', 'SameSite=Strict', 'Path=/']) assert.ok(cookie.includes(text));
     assert.equal(login.headers.get('cache-control'), 'no-store');
     const headers = { Cookie: cookie.split(';')[0] };
     const me = await call('/api/auth/me', { headers });
     assert.equal(me.status, 200);
-    assert.deepEqual(await me.json(), { user: { id: 'driver', name: 'Nome', role: 'DRIVER' } });
+    assert.deepEqual(await me.json(), { user: { id: 'driver', name: 'Nome', role: 'DRIVER', companyId: 'test-company' } });
     assert.equal((await call('/api/drivers', { headers })).status, 403);
     const logout = await call('/api/auth/logout', { method: 'POST', headers });
     assert.equal(logout.status, 204);

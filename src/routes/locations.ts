@@ -1,3 +1,4 @@
+import { tenantId } from '../tenant';
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma';
@@ -15,7 +16,7 @@ const point = z.object({
   recordedAt: z.coerce.date().optional(),
 });
 
-// DRIVER: envia 1 ponto ou um lote (lote = sincronização depois de ficar sem internet)
+// DRIVER: envia 1 ponto ou um lote (lote = sincronizaÃ§Ã£o depois de ficar sem internet)
 locations.post('/', requireRole('DRIVER'), async (req, res) => {
   const body = z.union([point, z.array(point).min(1).max(500)]).parse(req.body);
   const points = Array.isArray(body) ? body : [body];
@@ -23,7 +24,7 @@ locations.post('/', requireRole('DRIVER'), async (req, res) => {
 
   await prisma.location.createMany({
     data: points.map((p) => ({
-      driverId,
+      driverId, companyId: tenantId(),
       lat: p.lat,
       lng: p.lng,
       speed: p.speed,
@@ -31,7 +32,7 @@ locations.post('/', requireRole('DRIVER'), async (req, res) => {
     })),
   });
 
-  // avisa o painel só com o ponto mais recente
+  // avisa o painel sÃ³ com o ponto mais recente
   const last = points[points.length - 1];
   emitToAdmins('driver:location', {
     driverId,

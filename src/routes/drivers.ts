@@ -1,4 +1,5 @@
-﻿import { disconnectDriver, emitToAdmins } from '../realtime';
+import { tenantId } from '../tenant';
+import { disconnectDriver, emitToAdmins } from '../realtime';
 import { Router } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
@@ -16,7 +17,7 @@ drivers.post('/', async (req, res) => {
 
   const user = await prisma.user.create({
     data: {
-      name: d.name,
+      companyId: tenantId(), name: d.name,
       email: d.email.toLowerCase(),
       passwordHash: await bcrypt.hash(d.password, 10),
       role: 'DRIVER',

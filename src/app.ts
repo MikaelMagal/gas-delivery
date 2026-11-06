@@ -1,4 +1,5 @@
-﻿import express from 'express';
+import { platform } from './routes/platform';
+import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { rateLimit } from 'express-rate-limit';
@@ -37,7 +38,7 @@ export function createApp() {
   api.use((_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
   api.use(rateLimit({ windowMs: 60000, limit: 300, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Muitas solicitações. Aguarde um minuto.' } }));
   api.get('/health', (_req, res) => res.json({ ok: true }));
-  api.use('/auth', authRoutes); api.use('/drivers', drivers); api.use('/deliveries', deliveries);
+  api.use('/platform', platform); api.use('/auth', authRoutes); api.use('/drivers', drivers); api.use('/deliveries', deliveries);
   api.use('/locations', locations); api.use('/shifts', shifts); api.use('/route', routing); api.use('/geocoding', geocoding);
   app.use('/api', api);
   // Preserve direct endpoints for existing integrations; apply the same protections.
@@ -52,6 +53,7 @@ export function createApp() {
     if (err instanceof ZodError) return res.status(400).json({ error: 'Dados inválidos', details: err.issues.map(({ path, message }) => ({ path, message })) });
     if (err?.code === 'P2002') return res.status(409).json({ error: 'Registro já existe' });
     if (err?.code === 'P2025') return res.status(404).json({ error: 'Registro não encontrado' });
+    if (err?.status === 403) return res.status(403).json({ error: 'Selecione uma empresa autorizada.' });
     if (err?.status === 400 || err?.status === 409) return res.status(err.status).json({ error: err.status === 400 ? 'Dados inválidos. Confira os campos.' : err.message });
     if (err?.status === 413) return res.status(413).json({ error: 'Solicitação muito grande' });
     if (err?.code === 'P2034') return res.status(409).json({ error: 'Os dados mudaram. Atualize e tente novamente.' });

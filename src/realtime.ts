@@ -1,4 +1,5 @@
-﻿import { decode } from 'jsonwebtoken';
+import { tenantId } from './tenant';
+import { decode } from 'jsonwebtoken';
 import { config } from './config';
 import { cookieToken } from './session';
 import { Server } from 'socket.io';
@@ -26,8 +27,9 @@ export function initRealtime(httpServer: HttpServer) {
   });
 
   io.on('connection', (socket) => {
-    const user = socket.data.user as { id: string; role: string };
-    if (user.role === 'ADMIN') socket.join('admins');
+    const user = socket.data.user as { id: string; role: string; companyId?: string | null };
+    socket.join(`user:${user.id}`);
+    if (user.role === 'ADMIN' || user.role === 'PLATFORM_ADMIN') { if (user.companyId) socket.join(`company:${user.companyId}:admins`); }
     else socket.join(`driver:${user.id}`);
     const expires = setTimeout(() => socket.disconnect(true), Math.max(0, socket.data.expiresAt - Date.now()));
     socket.on('disconnect', () => clearTimeout(expires));
@@ -35,11 +37,12 @@ export function initRealtime(httpServer: HttpServer) {
   return io;
 }
 
-export const emitToAdmins = (event: string, payload: unknown) => io.to('admins').emit(event, payload);
+export const emitToAdmins = (event: string, payload: unknown) => io?.to(`company:${tenantId()}:admins`).emit(event, payload);
 export const emitToDriver = (driverId: string, event: string, payload: unknown) =>
-  io.to(`driver:${driverId}`).emit(event, payload);
+  io?.to(`driver:${driverId}`).emit(event, payload);
 
-export function disconnectDriver(driverId: string) { io?.in(`driver:${driverId}`).disconnectSockets(true); }
+export function disconnectDriver(driverId: string) { io?.in(`user:${driverId}`).disconnectSockets(true); }
+export function disconnectCompany(companyId: string) { io?.in(`company:${companyId}:admins`).disconnectSockets(true); }
 
 
 
@@ -47,7 +50,7 @@ export function disconnectDriver(driverId: string) { io?.in(`driver:${driverId}`
 // Invalidation contains no customer or GPS data. Consumers fetch their authorized view.
 export function publishDeliveryChange(delivery: { id: string; driverId: string | null }, previousDriverId?: string | null) {
   const payload = { id: delivery.id };
-  io?.to('admins').emit('delivery:updated', payload);
+  io?.to(`company:${tenantId()}:admins`).emit('delivery:updated', payload);
   for (const id of new Set([delivery.driverId, previousDriverId])) {
     if (id) io?.to(`driver:${id}`).emit('delivery:updated', payload);
   }

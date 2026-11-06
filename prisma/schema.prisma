@@ -8,6 +8,7 @@ datasource db {
 }
 
 enum Role {
+  PLATFORM_ADMIN
   ADMIN
   DRIVER
 }
@@ -19,7 +20,21 @@ enum DeliveryStatus {
   CANCELED
 }
 
+model Company {
+  id String @id @default(cuid())
+  name String
+  active Boolean @default(true)
+  createdAt DateTime @default(now())
+  users User[]
+  deliveries Delivery[]
+  locations Location[]
+  shifts Shift[]
+  changes DeliveryChange[]
+}
+
 model User {
+  companyId String?
+  company Company? @relation(fields: [companyId], references: [id])
   id           String     @id @default(cuid())
   name         String
   email        String     @unique
@@ -32,9 +47,14 @@ model User {
   deliveries   Delivery[]
   locations    Location[]
   shifts       Shift[]
+
+  @@index([companyId])
+  @@unique([id, companyId])
 }
 
 model Delivery {
+  companyId String
+  company Company @relation(fields: [companyId], references: [id])
   id                 String         @id @default(cuid())
   customerName       String
   phone              String?
@@ -48,7 +68,7 @@ model Delivery {
   sortOrder          Int            @default(0)   // ordem sugerida pelo adm
 
   driverId           String?
-  driver             User?          @relation(fields: [driverId], references: [id])
+  driver             User?          @relation(fields: [driverId, companyId], references: [id, companyId], onDelete: NoAction, onUpdate: NoAction, map: "Delivery_driver_company_fkey")
 
   // comprovação da entrega
   deliveredAt        DateTime?
@@ -62,34 +82,44 @@ model Delivery {
   changes DeliveryChange[]
 
   @@index([driverId, status])
+  @@index([companyId, status])
+  @@unique([id, companyId])
 }
 
 model Location {
+  companyId String
+  company Company @relation(fields: [companyId], references: [id])
   id         Int      @id @default(autoincrement())
   driverId   String
-  driver     User     @relation(fields: [driverId], references: [id])
+  driver     User     @relation(fields: [driverId, companyId], references: [id, companyId], onDelete: NoAction, onUpdate: NoAction, map: "Location_driver_company_fkey")
   lat        Float
   lng        Float
   speed      Float?
   recordedAt DateTime @default(now())
 
   @@index([driverId, recordedAt])
+  @@index([companyId])
 }
 
 model Shift {
+  companyId String
+  company Company @relation(fields: [companyId], references: [id])
   id        String    @id @default(cuid())
   driverId  String
-  driver    User      @relation(fields: [driverId], references: [id])
+  driver    User      @relation(fields: [driverId, companyId], references: [id, companyId], onDelete: NoAction, onUpdate: NoAction, map: "Shift_driver_company_fkey")
   startedAt DateTime  @default(now())
   endedAt   DateTime?
 
   @@index([driverId, endedAt])
+  @@index([companyId])
 }
 
 model DeliveryChange {
+  companyId String
+  company Company @relation(fields: [companyId], references: [id])
   id         String   @id @default(cuid())
   deliveryId String
-  delivery   Delivery @relation(fields: [deliveryId], references: [id])
+  delivery   Delivery @relation(fields: [deliveryId, companyId], references: [id, companyId], onDelete: NoAction, onUpdate: NoAction, map: "DeliveryChange_delivery_company_fkey")
   actorId    String
   actor      User     @relation(fields: [actorId], references: [id])
   action     String
@@ -99,4 +129,5 @@ model DeliveryChange {
   createdAt  DateTime @default(now())
 
   @@index([deliveryId, createdAt])
+  @@index([companyId])
 }

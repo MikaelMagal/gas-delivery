@@ -1,6 +1,7 @@
-﻿import DriverDashboard from './DriverDashboard'
+import DriverDashboard from './DriverDashboard'
 import { useCallback, useEffect, useState } from 'react'
 import Dashboard from './Dashboard'
+import PlatformDashboard from './PlatformDashboard'
 
 import type { Session } from './types'
 import { Flame, Truck, Eye, EyeOff } from 'lucide-react'
@@ -57,7 +58,7 @@ function App() {
 
 
 
-      if (!data.user || typeof data.user.id !== 'string' || typeof data.user.name !== 'string' || !['ADMIN', 'DRIVER'].includes(data.user.role)) {
+      if (!data.user || typeof data.user.id !== 'string' || typeof data.user.name !== 'string' || !['ADMIN', 'DRIVER', 'PLATFORM_ADMIN'].includes(data.user.role)) {
         throw new Error('A API retornou uma sessão inválida.')
       }
 
@@ -77,6 +78,10 @@ function App() {
   }
 
   if (checkingSession) return <main className="panel-state" role="status">Verificando sessão…</main>
+  if (session?.user.role === 'PLATFORM_ADMIN') {
+    if (!session.user.companyId) return <PlatformDashboard onSession={setSession} onLogout={logout} />
+    return <><div className="driver-card"><strong>Operação da empresa: {session.user.companyName || 'Empresa selecionada'}</strong><button className="secondary-button" onClick={() => { void fetch('/api/platform/access', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ companyId: null }) }).then(async r => { if (!r.ok) throw new Error('Falha'); setSession(await r.json()) }).catch(() => logout('Entre novamente para selecionar outra empresa.')) }}>Voltar às empresas</button></div><Dashboard key={session.user.companyId} session={session} onLogout={logout} /></>
+  }
   if (session?.user.role === 'ADMIN') return <Dashboard session={session} onLogout={logout} />
   if (session) return <DriverDashboard session={session} onLogout={logout} />
   return (

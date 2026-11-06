@@ -1,9 +1,9 @@
-﻿const { test } = require('node:test');
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 process.env.JWT_SECRET = 'integration-test-only-secret';
 const express = require('express');
 const jwt = require('jsonwebtoken');
-const { prisma } = require('../dist/prisma');
+const { prisma } = require('./helpers/companyMocks.cjs');
 const { credentialFor } = require('../dist/auth');
 prisma.user.findUnique = async ({ where }) => ({ id: where.id, role: where.id === 'driver-auth' ? 'DRIVER' : 'ADMIN', active: true, passwordHash: 'test-hash' });
 const { geocoding } = require('../dist/routes/geocoding');

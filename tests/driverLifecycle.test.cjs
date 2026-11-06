@@ -1,10 +1,10 @@
-﻿const { test } = require('node:test');
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 process.env.JWT_SECRET = 'test-only-secret';
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const { ZodError } = require('zod');
-const { prisma } = require('../dist/prisma');
+const { prisma } = require('./helpers/companyMocks.cjs');
 const { signToken } = require('../dist/auth');
 const rt = require('../dist/realtime');
 rt.emitToAdmins = () => {}; rt.emitToDriver = () => {}; rt.disconnectDriver = () => {};

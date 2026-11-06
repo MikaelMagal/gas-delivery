@@ -1,6 +1,6 @@
-﻿import bcrypt from 'bcryptjs';
+import bcrypt from 'bcryptjs';
 import { config } from './config';
-import { prisma } from './prisma';
+import { systemPrisma as prisma } from './prisma';
 export async function assertProductionAccounts() {
   if (!config.production) return;
   const accounts = await prisma.user.findMany({ where: { active: true }, select: { role: true, passwordHash: true, email: true } });

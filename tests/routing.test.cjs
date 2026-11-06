@@ -1,10 +1,10 @@
-﻿const test = require('node:test');
+const test = require('node:test');
 const assert = require('node:assert/strict');
 process.env.JWT_SECRET = 'test-routing-secret';
 const express = require('express');
 const { ZodError } = require('zod');
 const { config } = require('../dist/config');
-const { prisma } = require('../dist/prisma');
+const { prisma } = require('./helpers/companyMocks.cjs');
 const { signToken } = require('../dist/auth');
 const { routing } = require('../dist/routes/routing');
 test('routing: missing token fallback, ownership, validation, provider conversion and sanitized failures', async () => {
