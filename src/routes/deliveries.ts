@@ -4,16 +4,14 @@ import { z } from 'zod';
 import { prisma } from '../prisma';
 import { auth, requireRole } from '../auth';
 import { config } from '../config';
-import { distanceM, startOfToday } from '../utils';
+import { distanceM } from '../utils';
+import { operationalWindow, byOperationalStatus } from '../deliveryVisibility';
 import { publishDeliveryChange } from '../realtime';
 
 export const deliveries = Router();
 deliveries.use(auth);
 
-// Mostra o que foi criado hoje + o que ainda está aberto (não perde pendências de ontem)
-const visibleNow = () => ({
-  OR: [{ createdAt: { gte: startOfToday() } }, { status: { in: ['PENDING', 'EN_ROUTE'] as ('PENDING' | 'EN_ROUTE')[] } }],
-});
+const visibleNow = operationalWindow;
 
 const createSchema = z.object({
   customerName: z.string().trim().min(1),
@@ -50,7 +48,7 @@ deliveries.get('/', requireRole('ADMIN'), async (req, res) => {
     orderBy: [{ driverId: 'asc' }, { sortOrder: 'asc' }],
     include: { driver: { select: { id: true, name: true } } },
   });
-  res.json(list);
+  res.json(list.sort(byOperationalStatus));
 });
 
 // ADMIN: historical reporting is separate from today's operational list.
