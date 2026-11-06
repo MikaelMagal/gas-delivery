@@ -1,4 +1,4 @@
-﻿const { test } = require('node:test');
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 process.env.JWT_SECRET = 'test-only-secret';
 const express = require('express');
@@ -36,7 +36,7 @@ test('drivers and assignment: role checks, registration, validation and pending-
     registered = data;
     return { id: 'driver', name: data.name, email: data.email };
   };
-  prisma.user.findMany = async () => [{ id: 'driver', name: 'Nome', locations: [], shifts: [] }];
+  prisma.user.findMany = async () => [{ id: 'driver', name: 'Nome', email: 'nome@example.com', locations: [], shifts: [] }];
   prisma.user.findFirst = async ({ where }) => {
     assert.equal(where.role, 'DRIVER'); assert.equal(where.active, true);
     return where.id === 'driver' ? { id: 'driver' } : null;
@@ -65,7 +65,7 @@ test('drivers and assignment: role checks, registration, validation and pending-
     assert.ok(registered);
     prisma.user.create = async () => { throw { code: 'P2002' }; };
     assert.equal((await call('/drivers', 'POST', { name: 'Nome', email: 'nome@example.com', password: 'secret123' })).status, 409);
-    assert.deepEqual(await (await call('/drivers')).json(), [{ id: 'driver', name: 'Nome', lastLocation: null, onShift: false }]);
+    assert.deepEqual(await (await call('/drivers')).json(), [{ id: 'driver', name: 'Nome', email: 'nome@example.com', lastLocation: null, onShift: false }]);
     const payload = { customerName: 'Cliente', address: 'Rua Teste', product: 'Gas', lat: 0, lng: 0, driverId: 'admin-or-inactive' };
     assert.equal((await call('/deliveries', 'POST', payload)).status, 400);
     assert.equal(created, 0);

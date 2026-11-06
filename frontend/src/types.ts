@@ -5,6 +5,7 @@ export const labels: Record<Status, string> = { PENDING: 'Pendente', EN_ROUTE: '
 export type Driver = {
   id: string
   name: string
+  email: string
   onShift: boolean
   lastLocation: { lat: number; lng: number; recordedAt: string } | null
 }

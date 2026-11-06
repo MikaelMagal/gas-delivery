@@ -34,6 +34,7 @@ drivers.get('/', async (_req, res) => {
     select: {
       id: true,
       name: true,
+      email: true,
       locations: { orderBy: { recordedAt: 'desc' }, take: 1, select: { lat: true, lng: true, recordedAt: true } },
       shifts: { where: { endedAt: null }, take: 1, select: { id: true, startedAt: true } },
     },
@@ -43,6 +44,7 @@ drivers.get('/', async (_req, res) => {
     list.map((u) => ({
       id: u.id,
       name: u.name,
+      email: u.email,
       lastLocation: u.locations[0] ?? null,
       onShift: u.shifts.length > 0,
     })),
